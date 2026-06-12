@@ -4,9 +4,14 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCorners,
+  defaultDropAnimationSideEffects,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -37,6 +42,9 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [openIssueId, setOpenIssueId] = useState<string | null>(null);
+  const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
+  const [placeholderStatus, setPlaceholderStatus] = useState<IssueStatus | null>(null);
+  const [placeholderIndex, setPlaceholderIndex] = useState<number | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -130,6 +138,11 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
     return result;
   }, [filteredIssues]);
 
+  const activeIssue = useMemo(
+    () => (activeIssueId ? project.issues.find((issue) => issue.id === activeIssueId) : undefined),
+    [activeIssueId, project.issues]
+  );
+
   const modalIssue = useMemo(
     () => (openIssueId ? project.issues.find((issue) => issue.id === openIssueId) : undefined),
     [openIssueId, project.issues]
@@ -164,6 +177,51 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
     return undefined;
   }
 
+  function resetDragState() {
+    setActiveIssueId(null);
+    setPlaceholderStatus(null);
+    setPlaceholderIndex(null);
+  }
+
+  function onDragStart(event: DragStartEvent) {
+    setActiveIssueId(String(event.active.id));
+  }
+
+  function onDragOver(event: DragOverEvent) {
+    if (!event.over || !activeIssueId) {
+      setPlaceholderStatus(null);
+      setPlaceholderIndex(null);
+      return;
+    }
+
+    const overId = String(event.over.id);
+    const status = ISSUE_STATUS_ORDER.includes(overId as IssueStatus)
+      ? (overId as IssueStatus)
+      : getStatusByIssueId(overId);
+
+    if (!status) {
+      setPlaceholderStatus(null);
+      setPlaceholderIndex(null);
+      return;
+    }
+
+    const list = groupedIssues[status] ?? [];
+    const index =
+      ISSUE_STATUS_ORDER.includes(overId as IssueStatus)
+        ? list.length
+        : Math.max(
+            0,
+            list.findIndex((issue) => issue.id === overId)
+          );
+
+    setPlaceholderStatus(status);
+    setPlaceholderIndex(index);
+  }
+
+  function onDragCancel(_event: DragCancelEvent) {
+    resetDragState();
+  }
+
   function reorderWithPositions(status: IssueStatus, issues: JIssue[]): JIssue[] {
     return issues.map((issue, idx) => ({
       ...issue,
@@ -177,11 +235,13 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
     const overId = event.over ? String(event.over.id) : null;
 
     if (!overId) {
+      resetDragState();
       return;
     }
 
     const sourceStatus = getStatusByIssueId(activeId);
     if (!sourceStatus) {
+      resetDragState();
       return;
     }
 
@@ -190,12 +250,14 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
       : getStatusByIssueId(overId);
 
     if (!targetStatus) {
+      resetDragState();
       return;
     }
 
     const sourceList = [...groupedIssues[sourceStatus]];
     const sourceIndex = sourceList.findIndex((issue) => issue.id === activeId);
     if (sourceIndex < 0) {
+      resetDragState();
       return;
     }
 
@@ -206,11 +268,13 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
           : sourceList.findIndex((issue) => issue.id === overId);
 
       if (targetIndex < 0 || targetIndex === sourceIndex) {
+        resetDragState();
         return;
       }
 
       const moved = arrayMove(sourceList, sourceIndex, targetIndex);
       updatePositionsMutation.mutate(reorderWithPositions(sourceStatus, moved));
+      resetDragState();
       return;
     }
 
@@ -230,6 +294,7 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
     ];
 
     updatePositionsMutation.mutate(updates);
+    resetDragState();
   }
 
   return (
@@ -251,13 +316,44 @@ export function BoardScreen({ project, currentUser }: BoardScreenProps) {
         onResetAll={resetFilters}
       />
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragCancel={onDragCancel}
+        onDragEnd={onDragEnd}
+      >
         <BoardColumns
           groupedIssues={groupedIssues}
           users={project.users}
           statuses={ISSUE_STATUS_ORDER}
           onOpenIssue={setOpenIssueId}
+          activeIssueId={activeIssueId}
+          placeholderStatus={placeholderStatus}
+          placeholderIndex={placeholderIndex}
         />
+
+        <DragOverlay
+          dropAnimation={{
+            duration: 250,
+            easing: 'cubic-bezier(0, 0, 0.2, 1)',
+            sideEffects: defaultDropAnimationSideEffects({
+              styles: {
+                active: {
+                  opacity: '0.4',
+                },
+              },
+            }),
+          }}
+        >
+          {activeIssue ? (
+            <div className="w-[250px] rounded-[3px] bg-white p-[10px] shadow-[0_8px_16px_rgba(9,30,66,0.25)]">
+              <p className="pb-3 text-[15px] text-[#172B4D]">{activeIssue.title}</p>
+              <div className="text-[11px] uppercase text-[#5e6c84]">{activeIssue.type}-{activeIssue.id}</div>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       <Modal

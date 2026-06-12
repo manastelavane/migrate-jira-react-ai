@@ -7,6 +7,7 @@ interface IssueCardProps {
   issue: JIssue;
   users: JUser[];
   onOpenIssue: (issueId: string) => void;
+  isGhosted?: boolean;
 }
 
 function typeIcon(type: IssueType) {
@@ -68,7 +69,7 @@ function priorityIcon(priority: IssuePriority) {
   );
 }
 
-export function IssueCard({ issue, users, onOpenIssue }: IssueCardProps) {
+export function IssueCard({ issue, users, onOpenIssue, isGhosted = false }: IssueCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: issue.id,
   });
@@ -76,7 +77,7 @@ export function IssueCard({ issue, users, onOpenIssue }: IssueCardProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDragging ? 0.15 : isGhosted ? 0.35 : 1,
   };
 
   const assignees = users.filter((user) => issue.userIds.includes(user.id));

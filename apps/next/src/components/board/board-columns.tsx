@@ -9,6 +9,9 @@ interface BoardColumnsProps {
   users: JUser[];
   statuses: IssueStatus[];
   onOpenIssue: (issueId: string) => void;
+  activeIssueId: string | null;
+  placeholderStatus: IssueStatus | null;
+  placeholderIndex: number | null;
 }
 
 interface BoardColumnProps {
@@ -16,10 +19,31 @@ interface BoardColumnProps {
   issues: JIssue[];
   users: JUser[];
   onOpenIssue: (issueId: string) => void;
+  activeIssueId: string | null;
+  placeholderStatus: IssueStatus | null;
+  placeholderIndex: number | null;
 }
 
-function BoardColumn({ status, issues, users, onOpenIssue }: BoardColumnProps) {
+function BoardColumn({
+  status,
+  issues,
+  users,
+  onOpenIssue,
+  activeIssueId,
+  placeholderStatus,
+  placeholderIndex,
+}: BoardColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
+  const shouldShowPlaceholder = placeholderStatus === status && placeholderIndex !== null;
+
+  const renderPlaceholder = (key: string) => (
+    <div
+      key={key}
+      className="mb-[5px] rounded-[3px] border border-dashed border-[#abc] bg-[rgba(150,150,200,0.1)] p-[10px]"
+    >
+      <div className="h-[54px]" />
+    </div>
+  );
 
   return (
     <section
@@ -33,16 +57,41 @@ function BoardColumn({ status, issues, users, onOpenIssue }: BoardColumnProps) {
       </div>
       <div className="h-full pl-2 pr-2">
         <SortableContext items={issues.map((issue) => issue.id)} strategy={verticalListSortingStrategy}>
-          {issues.map((issue) => (
-            <IssueCard key={issue.id} issue={issue} users={users} onOpenIssue={onOpenIssue} />
-          ))}
+          {issues.flatMap((issue, index) => {
+            const placeholderNode =
+              shouldShowPlaceholder && placeholderIndex === index
+                ? [renderPlaceholder(`placeholder-${status}-${index}`)]
+                : [];
+
+            return [
+              ...placeholderNode,
+              <IssueCard
+                key={issue.id}
+                issue={issue}
+                users={users}
+                onOpenIssue={onOpenIssue}
+                isGhosted={activeIssueId === issue.id}
+              />,
+            ];
+          })}
+          {shouldShowPlaceholder && placeholderIndex === issues.length
+            ? renderPlaceholder(`placeholder-${status}-end`)
+            : null}
         </SortableContext>
       </div>
     </section>
   );
 }
 
-export function BoardColumns({ groupedIssues, users, statuses, onOpenIssue }: BoardColumnsProps) {
+export function BoardColumns({
+  groupedIssues,
+  users,
+  statuses,
+  onOpenIssue,
+  activeIssueId,
+  placeholderStatus,
+  placeholderIndex,
+}: BoardColumnsProps) {
   return (
     <div className="flex mt-7 overflow-x-auto pb-4">
       {statuses.map((status) => (
@@ -52,6 +101,9 @@ export function BoardColumns({ groupedIssues, users, statuses, onOpenIssue }: Bo
           issues={groupedIssues[status] ?? []}
           users={users}
           onOpenIssue={onOpenIssue}
+          activeIssueId={activeIssueId}
+          placeholderStatus={placeholderStatus}
+          placeholderIndex={placeholderIndex}
         />
       ))}
     </div>
