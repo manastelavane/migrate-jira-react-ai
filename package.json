@@ -10,7 +10,10 @@
     "test-cover": "vitest run --coverage",
     "lint": "ng lint",
     "lint:fix": "ng lint --fix=true",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "dev:angular": "ng serve",
+    "dev:next": "cd apps/next && next dev",
+    "build:next": "cd apps/next && next build"
   },
   "private": true,
   "dependencies": {
