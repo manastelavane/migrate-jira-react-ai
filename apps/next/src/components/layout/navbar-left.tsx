@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from 'react';
-import { Avatar, Modal, Popover, Tooltip } from 'antd';
+import { Avatar, Modal, Popover, Select, Tooltip } from 'antd';
 import { PlusOutlined, QuestionCircleFilled, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUserQuery, useProjectQuery } from '@/hooks/use-project-query';
 import { createIssue } from '@/services/project.service';
-import { IssuePriority, IssueStatus, IssueType, type JProject } from '@/interfaces';
+import { IssuePriority, IssueStatus, IssueType, type JProject, type JUser } from '@/interfaces';
 
 const navItems = [
   { key: 'search', icon: <SearchOutlined className="text-xl text-white" />, tooltip: 'Search issues' },
@@ -23,7 +23,88 @@ export function NavbarLeft() {
   const [description, setDescription] = useState('');
   const [type, setType] = useState<IssueType>(IssueType.TASK);
   const [priority, setPriority] = useState<IssuePriority>(IssuePriority.MEDIUM);
-  const [status, setStatus] = useState<IssueStatus>(IssueStatus.BACKLOG);
+  const [reporterId, setReporterId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+
+  function issueTypeIcon(issueType: IssueType) {
+    if (issueType === IssueType.BUG) {
+      return (
+        <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden="true">
+          <g transform="translate(1 1)" fill="none" fillRule="evenodd">
+            <rect fill="#E5493A" width="14" height="14" rx="2" />
+            <path d="M10 7a3 3 0 11-6 0 3 3 0 016 0" fill="#FFF" />
+          </g>
+        </svg>
+      );
+    }
+    if (issueType === IssueType.STORY) {
+      return (
+        <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden="true">
+          <g transform="translate(1 1)" fill="none" fillRule="evenodd">
+            <rect fill="#63BA3C" width="14" height="14" rx="2" />
+            <path
+              d="M9 3H5a1 1 0 00-1 1v6.5a.5.5 0 00.5.5.49.49 0 00.41-.231l.004.001L6.84 8.54a.2.2 0 01.32 0l1.926 2.23.004-.001A.49.49 0 009.5 11a.5.5 0 00.5-.5V4a1 1 0 00-1-1"
+              fill="#FFF"
+            />
+          </g>
+        </svg>
+      );
+    }
+    return (
+      <svg viewBox="0 0 16 16" className="h-5 w-5" aria-hidden="true">
+        <g transform="translate(1 1)" fill="none" fillRule="evenodd">
+          <rect fill="#4BADE8" width="14" height="14" rx="2" />
+          <path d="M6 9.5l4-5m-4 5l-2-2" stroke="#FFF" strokeWidth="2" strokeLinecap="round" />
+        </g>
+      </svg>
+    );
+  }
+
+  function priorityIcon(value: IssuePriority) {
+    const down = value === IssuePriority.LOW || value === IssuePriority.LOWEST;
+    const colorMap: Record<IssuePriority, string> = {
+      [IssuePriority.HIGHEST]: '#CD1317',
+      [IssuePriority.HIGH]: '#E9494A',
+      [IssuePriority.MEDIUM]: '#E97F33',
+      [IssuePriority.LOW]: '#2D8738',
+      [IssuePriority.LOWEST]: '#57A55A',
+    };
+    if (down) {
+      return (
+        <svg viewBox="0 0 6.35 7.938" className="h-5 w-5" style={{ color: colorMap[value] }} aria-hidden="true">
+          <path
+            d="M3.17.526a.265.265 0 00-.26.268v4.125L.982 2.987a.265.265 0 00-.19-.08.265.265 0 00-.185.455l2.38 2.38a.265.265 0 00.25.071.265.265 0 00.025-.007.265.265 0 00.025-.01.265.265 0 00.023-.012.265.265 0 00.002-.001.265.265 0 00.02-.013.265.265 0 00.017-.014.265.265 0 00.004-.004.265.265 0 00.01-.01l.009-.009 2.372-2.372a.265.265 0 10-.373-.375l-1.93 1.93V.793a.265.265 0 00-.27-.268z"
+            fill="currentColor"
+          />
+        </svg>
+      );
+    }
+    return (
+      <svg viewBox="0 0 6.35 7.938" className="h-5 w-5" style={{ color: colorMap[value] }} aria-hidden="true">
+        <path
+          d="M3.17.526a.265.265 0 00-.205.104L.605 2.987a.265.265 0 00.376.375L2.91 1.43v4.125a.265.265 0 10.53 0V1.433L5.37 3.362a.265.265 0 10.373-.375L3.383.628A.265.265 0 003.17.526z"
+          fill="currentColor"
+        />
+      </svg>
+    );
+  }
+
+  function timesIcon() {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+        <path d="M12 10.586L6.707 5.293a1 1 0 00-1.414 1.414L10.586 12l-5.293 5.293a1 1 0 001.414 1.414L12 13.414l5.293 5.293a1 1 0 001.414-1.414L13.414 12l5.293-5.293a1 1 0 10-1.414-1.414L12 10.586z" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  function userRow(user: JUser) {
+    return (
+      <div className="flex items-center">
+        <img src={user.avatarUrl} alt={user.name} className="h-5 w-5 rounded-full" />
+        <span className="ml-[6px] mr-[6px] -mt-[3px] text-[14.5px] text-[#42526E]">{user.name}</span>
+      </div>
+    );
+  }
 
   const createIssueMutation = useMutation({
     mutationFn: createIssue,
@@ -34,7 +115,8 @@ export function NavbarLeft() {
       setDescription('');
       setType(IssueType.TASK);
       setPriority(IssuePriority.MEDIUM);
-      setStatus(IssueStatus.BACKLOG);
+      setReporterId('');
+      setAssigneeIds([]);
     },
   });
 
@@ -42,6 +124,8 @@ export function NavbarLeft() {
     if (!project || !currentUser) {
       return;
     }
+    setReporterId(currentUser.id);
+    setAssigneeIds([]);
     setIsCreateOpen(true);
   }
 
@@ -55,9 +139,9 @@ export function NavbarLeft() {
       description,
       type,
       priority,
-      status,
-      reporterId: currentUser.id,
-      userIds: [currentUser.id],
+      status: IssueStatus.BACKLOG,
+      reporterId: reporterId || currentUser.id,
+      userIds: assigneeIds,
     });
   }
 
@@ -139,75 +223,110 @@ export function NavbarLeft() {
         footer={null}
         closable={false}
         onCancel={() => setIsCreateOpen(false)}
+        width={700}
         styles={{ body: { padding: 0 } }}
       >
-        <div className="px-8 py-6 text-[#172b4d]">
-          <div className="mb-4 text-2xl font-medium">Create issue</div>
+        <div className="px-8 py-5 text-[#172b4d]">
+          <div className="flex items-center py-3 text-[#172b4d]">
+            <div className="text-xl">Create issue</div>
+            <div className="flex-auto" />
+            <button
+              onClick={() => setIsCreateOpen(false)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[3px] text-[#42526E] hover:bg-[#ebecf0]"
+            >
+              {timesIcon()}
+            </button>
+          </div>
 
-          <div className="mb-3">
-            <label className="block mb-1 text-[13px] font-semibold uppercase text-[#5e6c84]">Title</label>
+          <div className="mt-1">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Issue type</label>
+            <Select
+              className="w-full"
+              value={type}
+              onChange={(value) => setType(value as IssueType)}
+              options={Object.values(IssueType).map((value) => ({
+                value,
+                label: (
+                  <div className="flex items-center">
+                    {issueTypeIcon(value)}
+                    <span className="ml-3 font-semibold uppercase text-[#5e6c84] text-[13px]">{value}</span>
+                  </div>
+                ),
+              }))}
+            />
+          </div>
+
+          <div className="mt-3">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Issue priority</label>
+            <Select
+              className="w-full"
+              value={priority}
+              onChange={(value) => setPriority(value as IssuePriority)}
+              options={Object.values(IssuePriority).map((value) => ({
+                value,
+                label: (
+                  <div className="flex items-center">
+                    {priorityIcon(value)}
+                    <span className="ml-3 font-semibold uppercase text-[#5e6c84] text-[13px]">{value}</span>
+                  </div>
+                ),
+              }))}
+            />
+          </div>
+
+          <div className="mt-3">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Short summary</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-[3px] border border-[#DFE1E6] px-3 py-[7px] text-[15px] outline-none focus:border-[#4c9aff]"
+              className="h-full w-full rounded-[3px] border border-[#ddd] px-3 py-[6px] text-[15px] text-[#172b4d] outline-none hover:bg-[#ebecf0] focus:bg-white focus:border-[#4c9aff] focus:shadow-[0_0_0_1px_#4c9aff]"
             />
           </div>
 
-          <div className="mb-3">
-            <label className="block mb-1 text-[13px] font-semibold uppercase text-[#5e6c84]">Description</label>
+          <div className="mt-3">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full min-h-[100px] rounded-[3px] border border-[#DFE1E6] px-3 py-[7px] text-[15px] outline-none focus:border-[#4c9aff]"
+              className="min-h-[120px] w-full rounded-[3px] border border-[#ddd] px-3 py-[7px] text-[15px] text-[#172b4d] outline-none hover:bg-[#ebecf0] focus:bg-white focus:border-[#4c9aff] focus:shadow-[0_0_0_1px_#4c9aff]"
             />
           </div>
 
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <div>
-              <label className="block mb-1 text-[13px] font-semibold uppercase text-[#5e6c84]">Type</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as IssueType)}
-                className="w-full rounded-[3px] border border-[#DFE1E6] px-2 py-[7px] text-[14px] outline-none focus:border-[#4c9aff]"
-              >
-                {Object.values(IssueType).map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block mb-1 text-[13px] font-semibold uppercase text-[#5e6c84]">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as IssuePriority)}
-                className="w-full rounded-[3px] border border-[#DFE1E6] px-2 py-[7px] text-[14px] outline-none focus:border-[#4c9aff]"
-              >
-                {Object.values(IssuePriority).map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block mb-1 text-[13px] font-semibold uppercase text-[#5e6c84]">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as IssueStatus)}
-                className="w-full rounded-[3px] border border-[#DFE1E6] px-2 py-[7px] text-[14px] outline-none focus:border-[#4c9aff]"
-              >
-                {Object.values(IssueStatus).map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </div>
+          <div className="mt-3">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Reporter</label>
+            <Select
+              className="w-full"
+              value={reporterId || undefined}
+              onChange={(value) => setReporterId(value)}
+              options={(project?.users ?? []).map((user) => ({
+                value: user.id,
+                label: userRow(user),
+              }))}
+            />
           </div>
 
-          <div className="flex pt-3">
+          <div className="mt-3">
+            <label className="block pb-2 text-[13px] font-medium text-[#5e6c84]">Assignees</label>
+            <Select
+              className="w-full"
+              mode="multiple"
+              value={assigneeIds}
+              onChange={(values) => setAssigneeIds(values)}
+              options={(project?.users ?? []).map((user) => ({
+                value: user.id,
+                label: userRow(user),
+              }))}
+              notFoundContent="No user found."
+            />
+          </div>
+
+          <div className="mt-5 text-right">
             <button
               onClick={submitCreateIssue}
               disabled={!title.trim() || createIssueMutation.isPending}
-              className="mr-2 rounded-[3px] bg-[#0052cc] px-3 py-[6px] text-white text-[14px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#0747a6]"
+              className="mr-2 rounded-[3px] bg-[#0052cc] px-3 py-[6px] text-white text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#0747a6]"
             >
-              Create
+              Create Issue
             </button>
             <button
               onClick={() => setIsCreateOpen(false)}
